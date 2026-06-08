@@ -1,0 +1,64 @@
+name: Epic Free Games
+
+on:
+  schedule:
+    # 每6小时运行一次（UTC时间），新加坡时间对应 8点/14点/20点/2点
+    - cron: '0 0,6,12,18 * * *'
+  workflow_dispatch: # 允许手动触发
+
+jobs:
+  claim:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Restore session cache
+        uses: actions/cache@v4
+        with:
+          path: config
+          key: epic-session-${{ github.run_id }}
+          restore-keys: epic-session-
+
+      - name: Create config
+        run: |
+          mkdir -p config
+          cat > config/config.json << 'EOF'
+          {
+            "runOnStartup": true,
+            "cronSchedule": "0 0,6,12,18 * * *",
+            "webPortalConfig": {
+              "localtunnel": true
+            },
+            "accounts": [
+              {
+                "email": "${{ secrets.EPIC_EMAIL }}"
+              }
+            ],
+            "notifiers": [
+              {
+                "type": "telegram",
+                "token": "${{ secrets.TELEGRAM_TOKEN }}",
+                "chatId": "${{ secrets.TELEGRAM_CHAT_ID }}"
+              }
+            ]
+          }
+          EOF
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run
+        run: npm start
+        timeout-minutes: 15
+
+      - name: Save session cache
+        if: always()
+        uses: actions/cache@v4
+        with:
+          path: config
+          key: epic-session-${{ github.run_id }}
